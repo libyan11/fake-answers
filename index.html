@@ -1,0 +1,1475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>if("serviceWorker"in navigator&&location.protocol==="https:")addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C0F33">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fake Answers">
+<meta name="description" content="Fake Answers: the bluffing party game. Strange true facts with a word missing. Write a fake answer that fools your friends, then spot the truth. English and Arabic. Play online, free, no sign-up.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Cpath d=%27M6 20c8-6 18-8 26-8s18 2 26 8c0 18-10 32-26 32S6 38 6 20z%27 fill=%27%23FF5FA2%27/%3E%3Cellipse cx=%2722%27 cy=%2728%27 rx=%277%27 ry=%275%27 fill=%27%231C0F33%27/%3E%3Cellipse cx=%2742%27 cy=%2728%27 rx=%277%27 ry=%275%27 fill=%27%231C0F33%27/%3E%3C/svg%3E">
+<title>Fake Answers · Game Night</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap"></noscript>
+<script>/* connection tools load in the background, so the page shows at once; room actions wait for NET */window.NET=Promise.all(['vendor/peerjs-1.5.4.min.js','vendor/mqtt-5.10.1.min.js'].map(function(s){return new Promise(function(r){var e=document.createElement('script');e.src=s;e.async=false;e.onload=e.onerror=function(){r()};document.head.appendChild(e)})})).then(function(){window.NET_DONE=1});</script>
+<script>/* Game Night mode: only on night links */if(/[?&]night=/.test(location.search))document.write('<script src="/night.js"><\/script>')</script>
+<style>
+/* Layout: a game-show stage. The fact with a blank in the middle, your fake answer underneath; then the answers as big buttons, then the reveal, fakes first and the truth last. */
+:root {
+  --bg: #1C0F33;
+  --bg-2: #120922;
+  --bg-glow: #3B1A5E;
+  --panel: #26164A;
+  --shade: rgba(0, 0, 0, .24);
+  --ink: #F2F5FC;
+  --muted: #A3B1D1;
+  --line: rgba(242, 245, 252, .14);
+  --accent: #FF5FA2;
+  --accent-soft: rgba(255, 95, 162, .28);
+  --on-accent: #2B0016;
+  --mint: #5EE0B5;
+  --pink: #FF5E7E;
+  --danger: #FF8A9A;
+  --shadow: rgba(0, 0, 0, .5);
+  --backdrop: rgba(10, 4, 20, .78);
+  --f-display: 'Rubik', 'Trebuchet MS', system-ui, sans-serif;
+  --f-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at 50% 30%, var(--bg-glow), var(--bg) 60%, var(--bg-2));
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; line-height: 1.1; font-weight: 800; text-wrap: balance; }
+
+.screen { min-height: 100%; display: grid; place-items: center; padding-block: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-bottom, 0px)); }
+.panel { width: min(100%, 460px); display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.logo { font-size: 34px; display: flex; align-items: center; gap: 12px; }
+.logo svg { width: 42px; height: 42px; flex: none; }
+.tagline { margin: 6px 0 0; color: var(--muted); }
+.block { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.block h3 { font-size: 17px; font-weight: 700; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > * { min-width: 0; }
+.grow { flex: 1; }
+.input { font: inherit; font-size: 16px; min-height: 46px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: var(--ink); width: 100%; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; }
+.msg { min-height: 20px; font-weight: 700; font-size: 13.5px; color: var(--muted); }
+.msg.err { color: var(--danger); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.room-code { font-family: var(--f-display); font-weight: 800; font-size: 48px; letter-spacing: .16em; color: var(--accent); line-height: 1; }
+.share { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.share code { background: var(--bg-2); border: 1px solid var(--line); padding: 6px 9px; border-radius: 8px; word-break: break-all; flex: 1; min-width: 0; font-family: var(--f-body); }
+.plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.plist li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.plist .nm { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mint); flex: none; }
+.dot.off { background: var(--danger); }
+.dot.cpu { background: var(--muted); }
+.x { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 700; }
+.set-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.set-row label { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.set-row select { min-height: 42px; padding: 6px 10px; }
+.btn { border-radius: 12px; padding: 12px 14px; font-weight: 800; font-size: 15px; border: 1px solid var(--line); background: var(--shade); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:not(:disabled):hover { filter: brightness(.93); }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 38px; font-size: 13px; font-weight: 700; color: var(--ink); }
+@media (hover: hover) { .ghost:hover { border-color: var(--accent); } }
+
+/* Game */
+#app { height: 100%; max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; padding-block: max(8px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand h1 { font-size: 21px; }
+.brand p { margin: 1px 0 0; font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+.net { color: var(--mint); }
+.net.warn { color: var(--accent); }
+.top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+#btnMenu { display: none; }
+.menu-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.menu-list .btn { text-align: left; }
+
+.people { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.people::-webkit-scrollbar { display: none; }
+.who { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 10px; min-width: 70px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.who .n { font-weight: 800; font-size: 12.5px; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .s { font-family: var(--f-display); font-weight: 800; font-size: 17px; color: var(--accent); line-height: 1; }
+.who .t { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.who.done { border-color: var(--mint); }
+.who.done .t { color: var(--mint); }
+.who.me { box-shadow: inset 0 0 0 1px var(--accent); }
+
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 8px 4px; overflow-y: auto; }
+.qno { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.question { font-family: var(--f-display); font-weight: 800; font-size: 27px; line-height: 1.2; max-width: 22ch; text-wrap: balance; }
+.clock { --p: 1; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--accent) calc(var(--p) * 360deg), rgba(255,255,255,.08) 0); position: relative; font-family: var(--f-display); font-weight: 800; font-size: 22px; }
+.clock::before { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--bg); }
+.clock span { position: relative; }
+.clock.low { background: conic-gradient(var(--pink) calc(var(--p) * 360deg), rgba(255,255,255,.08) 0); }
+.answer-big { font-family: var(--f-display); font-weight: 800; font-size: 46px; color: var(--mint); line-height: 1; animation: pop .45s ease both; }
+.answer-note { font-size: 13px; color: var(--muted); font-weight: 600; max-width: 40ch; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* the number line on the reveal */
+.line { position: relative; width: 100%; max-width: 520px; height: 64px; margin: 6px 0 0; }
+.line .bar { position: absolute; left: 0; right: 0; top: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); }
+.line .mark { position: absolute; top: 24px; width: 3px; height: 24px; margin-left: -1.5px; background: var(--mint); border-radius: 2px; }
+.line .mark b { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--mint); white-space: nowrap; }
+.line .pin { position: absolute; top: 4px; transform: translateX(-50%); font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; animation: drop .5s ease both; }
+.line .pin.win { border-color: var(--accent); color: var(--accent); }
+.line .pin::after { content: ''; position: absolute; left: 50%; top: 100%; width: 2px; height: var(--stem, 9px); background: var(--muted); margin-left: -1px; }
+@keyframes drop { from { transform: translate(-50%, -12px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+
+.results { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 5px; }
+.results li { display: grid; grid-template-columns: 26px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); text-align: left; animation: pop .35s ease both; }
+.results li.me-row { border-color: var(--accent); }
+.results .rk { font-family: var(--f-display); font-weight: 800; color: var(--accent); }
+.results .nm { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results .nm small { display: block; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.results .g { font-variant-numeric: tabular-nums; font-weight: 800; }
+.results .pt { font-weight: 800; color: var(--mint); min-width: 30px; text-align: right; }
+.results .pt.zero { color: var(--muted); }
+
+.act { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.act.mine { border-color: var(--accent); }
+.status { font-size: 15px; font-weight: 800; }
+.act.mine .status { color: var(--accent); }
+.sub { font-size: 13px; color: var(--muted); font-weight: 600; }
+.guess-form { display: flex; gap: 8px; }
+.guess-form .input { flex: 1; font-family: var(--f-display); font-size: 24px; font-weight: 800; text-align: center; letter-spacing: .02em; }
+.guess-form .btn { min-width: 110px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions .btn { flex: 1; }
+
+.log { font-size: 12.5px; color: var(--muted); }
+.log summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 0; }
+.log ol { margin: 6px 0 0; padding: 8px 12px 8px 30px; max-height: 140px; overflow-y: auto; background: var(--shade); border-radius: 10px; border: 1px solid var(--line); }
+
+.modal { position: fixed; inset: 0; z-index: 20; background: var(--backdrop); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet { width: min(100%, 520px); max-height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.sheet h2 { font-size: 25px; margin-bottom: 4px; }
+.sheet h2 span { color: var(--accent); }
+.sheet .lede { color: var(--muted); margin: 0 0 14px; }
+.sheet ul.rules { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.sheet ul.rules b { color: var(--accent); }
+.order { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.order li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.order li.me-row { border-color: var(--accent); }
+.order .pl { font-family: var(--f-display); font-weight: 800; color: var(--accent); font-size: 18px; }
+.order .nm { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order .pts { font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; min-width: 52px; }
+.order .pts small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; }
+.sheet-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+@media (max-width: 560px) {
+  #btnRules, #btnScores, #btnLeave { display: none; }
+  #btnMenu { display: inline-block; }
+  .room-code { font-size: 40px; }
+  .question { font-size: 23px; }
+  .answer-big { font-size: 40px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .brand p, .log { display: none; }
+  .question { font-size: 20px; }
+  .clock { width: 48px; height: 48px; font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+/* Fake Answers */
+.question { max-width: 26ch; }
+.question .blank { display: inline-block; min-width: 3.2em; border-bottom: 3px solid var(--accent); margin: 0 .15em; }
+.question .fill { color: var(--mint); border-bottom: 3px solid var(--mint); padding: 0 .15em; }
+.qcat { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; width: 100%; max-width: 560px; }
+.opt { border: 2px solid var(--line); background: var(--panel); border-radius: 14px; padding: 12px 10px; min-height: 54px; font-weight: 800; font-size: 16px; color: var(--ink); overflow-wrap: anywhere; }
+.opt:not(:disabled):hover { border-color: var(--accent); }
+.opt.picked { border-color: var(--accent); background: var(--accent-soft); }
+.opt.own { opacity: .55; border-style: dashed; }
+.opt.own small { display: block; font-size: 10.5px; color: var(--muted); font-weight: 700; }
+.opt:disabled { cursor: default; }
+.reveal-list { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 6px; }
+.reveal-list li { padding: 10px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); text-align: start; animation: pop .35s ease both; }
+.reveal-list li.truth { border-color: var(--mint); background: rgba(94, 224, 181, .14); }
+.reveal-list li.mine { box-shadow: inset 0 0 0 1px var(--accent); }
+.reveal-list .ans { font-weight: 800; font-size: 16px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.reveal-list .tag { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.reveal-list li.truth .tag { color: var(--mint); }
+.reveal-list .by { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+.reveal-list .by b { color: var(--ink); }
+.reveal-list .gain { color: var(--accent); font-weight: 800; }
+.write-form { display: flex; gap: 8px; }
+.write-form .input { flex: 1; font-weight: 800; font-size: 18px; min-width: 0; }
+.write-form .btn { min-width: 100px; }
+.rtl { direction: rtl; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="mask" viewBox="0 0 64 64"><path d="M6 20c8-6 18-8 26-8s18 2 26 8c0 18-10 32-26 32S6 38 6 20z" fill="#FF5FA2"/><ellipse cx="22" cy="28" rx="7" ry="5" fill="#1C0F33"/><ellipse cx="42" cy="28" rx="7" ry="5" fill="#1C0F33"/><path d="M22 41c6 4 14 4 20 0" stroke="#1C0F33" stroke-width="4" fill="none" stroke-linecap="round"/></symbol></svg>
+
+<section class="screen" id="home" hidden>
+  <div class="panel">
+    <div>
+      <h1 class="logo"><svg aria-hidden="true"><use href="#mask"/></svg>Fake Answers</h1>
+      <p class="tagline">A strange but true fact with a word missing. Everyone writes a fake answer that sounds real, then you all try to spot the truth. Fool your friends to score.</p>
+    </div>
+    <label class="eyebrow" for="hName">Your name</label>
+    <input class="input" id="hName" maxlength="14" autocomplete="nickname" placeholder="Type your name">
+    <div class="block">
+      <h3>Play with friends</h3>
+      <div id="onlineBox" class="row" style="flex-direction: column; align-items: stretch;">
+        <button class="btn primary" id="hCreate" type="button">Create a room</button>
+        <form class="row" id="joinForm">
+          <input class="input code-input grow" id="hCode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:auto">
+          <button class="btn" id="hJoin" type="submit">Join room</button>
+        </form>
+        <button class="btn" id="hReopen" type="button" hidden>Reopen your room</button>
+      </div>
+      <p class="note" id="onlineNote" hidden>Online rooms work on the website, not inside this preview: <a href="https://libyan11.github.io/fake-answers/" target="_blank" rel="noopener">libyan11.github.io/fake-answers</a></p>
+    </div>
+    <div class="block">
+      <h3>Practise against the computer</h3>
+      <div class="row">
+        <select class="input grow" id="hLangHome" style="width:auto" aria-label="Question language">
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+        <select class="input grow" id="hBots" style="width:auto" aria-label="Number of computer players">
+          <option value="2">2 computer players</option>
+          <option value="3" selected>3 computer players</option>
+          <option value="4">4 computer players</option>
+        </select>
+        <button class="btn" id="hSolo" type="button">Play</button>
+      </div>
+      <p class="note">Best with real people. Computer players only pick from ready-made fakes.</p>
+      <button class="btn" id="hContinue" type="button" hidden>Continue your game</button>
+    </div>
+    <p class="msg" id="homeMsg" aria-live="polite"></p>
+    <div class="row"><button class="ghost" id="hRules" type="button">Rules</button></div>
+  </div>
+</section>
+
+<section class="screen" id="lobby" hidden>
+  <div class="panel">
+    <div>
+      <p class="eyebrow">Room code</p>
+      <div class="room-code" id="lCode">····</div>
+      <p class="note" id="lNet">Opening room…</p>
+    </div>
+    <div class="share">
+      <code id="lLink"></code>
+      <button class="ghost" id="lCopy" type="button">Copy link</button>
+    </div>
+    <p class="note" id="lCopyMsg" aria-live="polite"></p>
+    <div class="block">
+      <h3 id="lCount">Players</h3>
+      <ul class="plist" id="lPlayers"></ul>
+      <div class="set-row" id="lSet">
+        <label>Language <select class="input" id="lLangSel"><option value="en">English</option><option value="ar">العربية</option></select></label>
+        <label>Questions <select class="input" id="lCountSel"><option value="5">5</option><option value="8">8</option><option value="10">10</option><option value="15">15</option></select></label>
+        <label>Time to write <select class="input" id="lTimeSel"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option><option value="0">No limit</option></select></label>
+        <label>Last question <select class="input" id="lDoubleSel"><option value="1">Double points</option><option value="0">Normal points</option></select></label>
+      </div>
+      <div class="row" id="lHost" style="flex-direction: column; align-items: stretch;">
+        <button class="btn" id="lAddBot" type="button">Add computer player</button>
+        <button class="btn primary" id="lStart" type="button">Start game</button>
+      </div>
+      <p class="note" id="lNote"></p>
+    </div>
+    <div class="row"><button class="ghost" id="lRules" type="button">Rules</button><button class="ghost" id="lLeave" type="button">Leave room</button></div>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>Fake Answers</h1>
+      <p><span id="roundNo">Question 1</span> <span class="net" id="net"></span></p>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="btnRules" type="button">Rules</button>
+      <button class="ghost" id="btnScores" type="button">Scores</button>
+      <button class="ghost" id="btnLeave" type="button">Leave</button>
+      <button class="ghost" id="btnMenu" type="button" aria-label="Menu: rules, scores, leave">Menu</button>
+    </div>
+  </header>
+
+  <section class="people" id="people" aria-label="Players and scores"></section>
+
+  <section class="stage" id="stage" aria-live="polite"></section>
+
+  <section class="act" id="act">
+    <div class="status" id="status"></div>
+    <div class="sub" id="sub"></div>
+    <form class="write-form" id="writeForm" hidden>
+      <input class="input" id="writeIn" maxlength="40" autocomplete="off" placeholder="Your fake answer" enterkeyhint="done" aria-label="Your fake answer">
+      <button class="btn primary" id="writeSend" type="submit">Lock in</button>
+    </form>
+    <div id="actMore"></div>
+  </section>
+
+  <details class="log" id="log">
+    <summary id="logLast">Game log</summary>
+    <ol id="logList" reversed></ol>
+  </details>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & helpers ================= */
+const BOT_NAMES = ['Nour', 'Sami', 'Layla', 'Karim', 'Huda', 'Omar', 'Rana'];
+const MAX_PLAYERS = 8, MIN_PLAYERS = 2, REVEAL_MS = 11000, MIN_OPTIONS = 4, PICK_SECS = 25;
+/* [fact with ___ for the missing part, the real answer, three ready-made fakes (the computer's and the house's), other ways to write the real answer] */
+const QS_EN = [
+  ['A group of flamingos is called a ___.', 'flamboyance', ['parade', 'blush', 'carnival']],
+  ['A group of crows is called a ___.', 'murder', ['shadow', 'choir', 'cloak']],
+  ['A group of owls is called a ___.', 'parliament', ['library', 'senate', 'hoot']],
+  ['The dot over a lowercase i or j is called a ___.', 'tittle', ['speck', 'crown', 'pip']],
+  ['The plastic tip at the end of a shoelace is called an ___.', 'aglet', ['eyelet', 'endcap', 'ocelet']],
+  ['The # symbol is officially called an ___.', 'octothorpe', ['octagram', 'gridmark', 'oxbar'], ['octothorp']],
+  ['Before it was called Google, the search engine was named ___.', 'BackRub', ['PageFinder', 'Googol', 'WebCrawl'], ['back rub']],
+  ['The national animal of Scotland is the ___.', 'unicorn', ['red deer', 'golden eagle', 'highland cow']],
+  ['The largest desert in the world is ___.', 'Antarctica', ['the Sahara', 'the Gobi', 'the Arabian Desert'], ['the antarctic', 'antarctic desert']],
+  ['An octopus has ___ hearts.', 'three', ['two', 'four', 'eight'], ['3']],
+  ['The first thing ever sold on eBay was a broken ___.', 'laser pointer', ['toaster', 'Game Boy', 'calculator']],
+  ['In Switzerland it is illegal to own just one ___, because it gets lonely.', 'guinea pig', ['goldfish', 'parrot', 'rabbit'], ['guinea pigs']],
+  ["The ashes of the man who designed the Pringles can were buried in a ___.", 'Pringles can', ['lunchbox', 'guitar case', 'bowling ball'], ['pringles tube', 'pringle can']],
+  ['Wombat poop is shaped like ___.', 'cubes', ['stars', 'pyramids', 'rings'], ['cube', 'squares', 'dice']],
+  ['A day on Venus is longer than a ___ on Venus.', 'year', ['month', 'week', 'season']],
+  ['The tiny pocket in jeans was first made for ___.', 'pocket watches', ['coins', 'keys', 'matches'], ['watches', 'a pocket watch', 'watch']],
+  ['The D in D-Day stands for ___.', 'Day', ['Defence', 'Deliverance', 'Departure']],
+  ['The national colour of the Netherlands is ___, even though it is not on the flag.', 'orange', ['gold', 'purple', 'green']],
+  ['A sloth can hold its breath longer than a ___.', 'dolphin', ['whale', 'seal', 'sea turtle'], ['dolphins']],
+  ['In 1923 a jockey won a horse race even though he was ___.', 'dead', ['blindfolded', 'asleep', '80 years old']],
+  ['The quietest room in the world is at the headquarters of ___.', 'Microsoft', ['Apple', 'NASA', 'Sony']],
+  ['The shortest war in history lasted about ___ minutes.', '38', ['12', '90', '5'], ['thirty eight', 'forty', '40']],
+  ['In the 1830s, ketchup was sold as a ___.', 'medicine', ['perfume', 'paint', 'hair dye'], ['cure', 'medicine for indigestion']],
+  ['A typical fluffy cloud weighs about as much as 100 ___.', 'elephants', ['cars', 'buses', 'whales'], ['elephant']],
+  ["A blue whale's heart is about the size of a small ___.", 'car', ['house', 'piano', 'fridge']],
+  ['Under their white fur, polar bears have ___ skin.', 'black', ['pink', 'blue', 'grey']],
+  ['Butterflies taste food with their ___.', 'feet', ['wings', 'eyes', 'tails'], ['legs']],
+  ['Saudi Arabia imports ___ from Australia.', 'camels', ['sand', 'dates', 'oil'], ['camel']],
+  ['The first webcam ever was pointed at a ___.', 'coffee pot', ['fish tank', 'parking lot', 'front door'], ['coffee machine', 'coffee maker']],
+  ['Nintendo started in 1889 as a company making ___.', 'playing cards', ['toys', 'umbrellas', 'rice cookers'], ['cards']],
+  ['By number made, Lego is the biggest maker of ___ in the world.', 'tyres', ['sandals', 'keychains', 'whistles'], ['tires', 'tyre', 'tire']],
+  ['Strawberries are not really berries, but ___ are.', 'avocados', ['apples', 'cherries', 'raspberries'], ['avocado']],
+  ['The athletes at the ancient Olympic Games competed ___.', 'naked', ['blindfolded', 'in armour', 'at night'], ['nude']],
+  ["The oldest known customer complaint, on a clay tablet, was about bad ___.", 'copper', ['wine', 'bread', 'sheep']],
+  ['Libyan Desert Glass, found in the Sahara, was most likely made by a ___.', 'meteor', ['volcano', 'lightning storm', 'ancient furnace'], ['meteorite', 'meteor impact', 'asteroid']],
+  ['Australia lost a "war" in 1932 against ___.', 'emus', ['kangaroos', 'koalas', 'wombats'], ['emu']],
+  ["Koalas have fingerprints so close to humans' that they could confuse ___.", 'police', ['doctors', 'zookeepers', 'phones'], ['detectives', 'crime scene investigators', 'investigators']],
+  ['Cats cannot taste ___ things.', 'sweet', ['salty', 'bitter', 'sour']],
+  ['Humans share about 60% of their DNA with ___.', 'bananas', ['mushrooms', 'jellyfish', 'roses'], ['banana']],
+  ['A baby puffin is called a ___.', 'puffling', ['puffkin', 'chickling', 'puffet']],
+  ['A baby kangaroo is called a ___.', 'joey', ['kit', 'cub', 'pup']],
+  ['Peanuts are not nuts. They are ___.', 'legumes', ['berries', 'roots', 'grains'], ['beans', 'legume', 'peas']],
+  ['The kiwi fruit used to be called the Chinese ___.', 'gooseberry', ['plum', 'apple', 'melon']],
+  ['Cows have best friends and get ___ when they are separated.', 'stressed', ['hungry', 'louder', 'sleepy'], ['anxious', 'sad']],
+  ['In Europe, tomatoes were once thought to be ___.', 'poisonous', ['medicine', 'lucky', 'flowers'], ['poison', 'deadly']],
+  ['A snail can sleep for up to ___ years.', 'three', ['ten', 'seven', 'five'], ['3']],
+  ['Bananas are curved because they grow towards the ___.', 'sun', ['ground', 'tree', 'rain'], ['sunlight', 'light']],
+  ['The longest-living animal ever found was a clam named ___.', 'Ming', ['Methuselah', 'Old Tom', 'Shelly']],
+  ['The Eiffel Tower gets about 15 cm taller in the ___.', 'summer', ['winter', 'rain', 'wind'], ['heat']],
+  ['Pineapples take about ___ years to grow.', 'two', ['five', 'seven', 'ten'], ['2']],
+  ['Before New York got its name, it was called New ___.', 'Amsterdam', ['Rotterdam', 'Hampshire', 'Utrecht']],
+  ['Astronauts cannot ___ properly in space, because there is no gravity.', 'burp', ['sneeze', 'whistle', 'sleep'], ['belch']],
+  ['Honeybees can recognise human ___.', 'faces', ['voices', 'names', 'shoes'], ['face']],
+  ['Sea otters hold ___ while they sleep, so they do not drift apart.', 'hands', ['tails', 'seaweed', 'rocks'], ['paws', 'each other']],
+  ['The Mona Lisa has no ___.', 'eyebrows', ['smile', 'background', 'hands'], ['eyebrow']],
+  ['Most of the oxygen we breathe comes from ___.', 'the ocean', ['rainforests', 'grass', 'mountains'], ['ocean', 'plankton', 'oceans', 'the sea', 'sea', 'algae']],
+  ['The inventor of the World Wide Web is Tim ___.', 'Berners-Lee', ['Cook', 'Walker', 'Jobs'], ['berners lee']],
+  ['A flock of sheep was once used to mow the grass at the ___ during World War I.', 'White House', ['Eiffel Tower', 'Taj Mahal', 'Colosseum'], ['whitehouse']],
+  ['Hot water can freeze faster than cold water. This is called the ___ effect.', 'Mpemba', ['Kelvin', 'Fahrenheit', 'Newton']],
+  ['A shrimp\'s heart is in its ___.', 'head', ['tail', 'legs', 'back']],
+  ['The fingerprint of every person is unique, and so is the print of every ___.', 'tongue', ['ear', 'eyelash', 'knee'], ['tongues']],
+  ['The first ever alarm clock could only ring at ___.', '4 am', ['noon', 'midnight', '7 am'], ['4am', '4', 'four', '4 o clock', 'four am']]
+];
+const QS_AR = [
+  ['يُسمّى صوت الغراب ___.', 'نعيب', ['صفير', 'طنين', 'هدير'], ['نعيق']],
+  ['يُسمّى صوت الضفدع ___.', 'نقيق', ['صرير', 'حفيف', 'هزيم']],
+  ['يُسمّى صوت الأفعى ___.', 'فحيح', ['هسيس', 'دبيب', 'صفير']],
+  ['يُسمّى صوت الظبي ___.', 'بغام', ['جؤار', 'عجيج', 'خوار'], ['نزيب']],
+  ['يُسمّى صوت الجمل ___.', 'رغاء', ['جعجعة', 'هدير', 'صهيل'], ['الرغاء']],
+  ['يُسمّى صوت الذئب ___.', 'عواء', ['نباح', 'هرير', 'زمجرة']],
+  ['يُسمّى صغير الفيل ___.', 'دغفل', ['جحش', 'فلو', 'برغوث']],
+  ['يُسمّى صغير الضفدع ___.', 'شرغوف', ['فقيس', 'ضفيدع', 'نقنوق'], ['دعموص', 'شرغوفه']],
+  ['يُسمّى صغير الأرنب ___.', 'خرنق', ['جرو', 'حمل', 'سخل']],
+  ['يُسمّى صغير الثعلب ___.', 'هجرس', ['دغفل', 'جرو', 'خرنق'], ['تتفل']],
+  ['يُسمّى صغير الناقة ___.', 'حوار', ['مهر', 'فصيل', 'عجل'], ['الحوار']],
+  ['يُسمّى صغير الحصان ___.', 'مهر', ['جحش', 'عجل', 'حوار'], ['فلو']],
+  ['يُسمّى بيت الأسد ___.', 'عرين', ['وكر', 'مغارة', 'قبو'], ['العرين']],
+  ['الحيوان الوطني لاسكتلندا هو ___.', 'وحيد القرن الأسطوري', ['الغزال الأحمر', 'النسر الذهبي', 'البقرة الجبلية'], ['اليونيكورن', 'يونيكورن', 'الحصان المجنح ذو القرن']],
+  ['تستورد السعودية ___ من أستراليا.', 'الجمال', ['الرمل', 'التمور', 'النفط'], ['جمال', 'الإبل', 'ابل']],
+  ['أول شيء بيع على موقع إيباي كان ___ مكسوراً.', 'مؤشر ليزر', ['محمصة خبز', 'جهاز ألعاب', 'آلة حاسبة'], ['قلم ليزر', 'ليزر']],
+  ['في سويسرا يمنع القانون اقتناء ___ واحد فقط لأنه يشعر بالوحدة.', 'خنزير غينيا', ['سمك ذهبي', 'ببغاء', 'أرنب'], ['خنزير غينيا واحد', 'الخنزير الغيني', 'خنزير غيني']],
+  ['فضلات حيوان الومبات على شكل ___.', 'مكعبات', ['نجوم', 'أهرامات', 'حلقات'], ['مكعب', 'مربعات']],
+  ['للأخطبوط ___ قلوب.', 'ثلاثة', ['قلبان', 'أربعة', 'ثمانية'], ['3', 'ثلاث']],
+  ['اليوم الواحد على كوكب الزهرة أطول من ___ على الزهرة.', 'السنة', ['الشهر', 'الأسبوع', 'الفصل'], ['سنة', 'العام', 'عام']],
+  ['الجيب الصغير في بنطلون الجينز صُنع أول مرة لـ ___.', 'ساعات الجيب', ['العملات', 'المفاتيح', 'أعواد الثقاب'], ['الساعة', 'ساعة الجيب', 'الساعات']],
+  ['في ثلاثينيات القرن التاسع عشر كان الكاتشب يُباع على أنه ___.', 'دواء', ['عطر', 'دهان', 'صبغة شعر'], ['علاج']],
+  ['أول كاميرا ويب في العالم كانت موجهة نحو ___.', 'إبريق قهوة', ['حوض سمك', 'موقف سيارات', 'باب منزل'], ['ابريق القهوه', 'آلة قهوة', 'ماكينة قهوة']],
+  ['بدأت شركة نينتندو سنة 1889 بصناعة ___.', 'ورق اللعب', ['الألعاب الخشبية', 'المظلات', 'طناجر الأرز'], ['الكوتشينة', 'ورق الشدة', 'أوراق اللعب', 'الورق']],
+  ['من حيث العدد، شركة ليغو هي أكبر صانع في العالم لـ ___.', 'الإطارات', ['الصنادل', 'الميداليات', 'الصفارات'], ['الاطارات', 'العجلات', 'الكفرات']],
+  ['تحت فرائه الأبيض، جلد الدب القطبي لونه ___.', 'أسود', ['وردي', 'أزرق', 'رمادي'], ['الأسود']],
+  ['تتذوق الفراشات الطعام بـ ___.', 'أرجلها', ['أجنحتها', 'عيونها', 'ذيلها'], ['الأرجل', 'أقدامها', 'الأقدام', 'رجليها']],
+  ['خسرت أستراليا "حرباً" سنة 1932 ضد طيور ___.', 'الإيمو', ['الكوكابورا', 'النعام', 'البطريق'], ['ايمو']],
+  ['قلب الحوت الأزرق بحجم ___ صغيرة.', 'سيارة', ['غرفة', 'ثلاجة', 'خيمة']],
+  ['القطط لا تستطيع تذوق الطعم ___.', 'الحلو', ['المالح', 'المر', 'الحامض'], ['الحلاوة', 'حلو']],
+  ['زجاج الصحراء الليبية تكوّن غالباً بسبب ___.', 'نيزك', ['بركان', 'صاعقة', 'فرن قديم'], ['ارتطام نيزك', 'النيزك', 'كويكب', 'نيازك']],
+  ['استمرت أقصر حرب في التاريخ حوالي ___ دقيقة.', '38', ['12', '90', '5'], ['٣٨', 'ثمانية وثلاثين', '40']],
+  ['كان اسم محرك البحث جوجل في البداية ___.', 'باك رب', ['بيج فايندر', 'جوجول', 'ويب كرول'], ['backrub', 'باكرب']],
+  ['أكبر صحراء في العالم هي ___.', 'القارة القطبية الجنوبية', ['الصحراء الكبرى', 'صحراء جوبي', 'الربع الخالي'], ['انتاركتيكا', 'أنتاركتيكا', 'القطب الجنوبي']],
+  ['الفول السوداني ليس من المكسرات، بل من ___.', 'البقوليات', ['التوتيات', 'الجذور', 'الحبوب'], ['البقول']],
+  ['اللون الوطني لهولندا هو ___ مع أنه ليس في علمها.', 'البرتقالي', ['الذهبي', 'البنفسجي', 'الأخضر'], ['برتقالي']],
+  ['حيوان الكسلان يحبس أنفاسه أطول من ___.', 'الدلفين', ['الحوت', 'الفقمة', 'السلحفاة البحرية'], ['الدولفين', 'دلفين']],
+  ['سنة 1923 فاز فارس بسباق خيول مع أنه كان ___.', 'ميتاً', ['معصوب العينين', 'نائماً', 'عمره 80 سنة'], ['ميت', 'متوفى']],
+  ['أهدأ غرفة في العالم موجودة في مقر شركة ___.', 'مايكروسوفت', ['أبل', 'ناسا', 'سوني']],
+  ['تزن السحابة العادية تقريباً ما يعادل وزن 100 ___.', 'فيل', ['سيارة', 'حافلة', 'حوت'], ['فيله', 'افيال']],
+  ['دُفن رماد مصمم علبة برينغلز داخل ___.', 'علبة برينغلز', ['صندوق غداء', 'حقيبة غيتار', 'كرة بولينغ'], ['علبه برينجلز', 'برينغلز']],
+  ['يُلقّب أهل ليبيا مدينة بنغازي بـ ___.', 'رباية الذايح', ['عروس البحر', 'مدينة الورد', 'لؤلؤة الشرق']],
+  ['تُلقّب طرابلس الليبية بـ ___.', 'عروس البحر', ['رباية الذايح', 'لؤلؤة المتوسط', 'مدينة السرايا'], ['عروس البحر المتوسط']],
+  ['أقدم جامعة في العالم ما زالت تعمل هي جامعة ___ في فاس.', 'القرويين', ['الأندلس', 'المرينيين', 'فاس الكبرى'], ['القرويين بفاس']],
+  ['كلمة "الجبر" في الرياضيات جاءت من كتاب للعالم ___.', 'الخوارزمي', ['ابن سينا', 'البيروني', 'الكندي']],
+  ['ثاني أكبر دولة عربية مساحةً بعد الجزائر هي ___.', 'السعودية', ['ليبيا', 'السودان', 'مصر'], ['المملكة العربية السعودية']],
+  ['قضاعة الماء (ثعالب البحر) تمسك ___ وهي نائمة حتى لا تتفرق.', 'أيدي بعضها', ['ذيولها', 'الطحالب', 'الصخور'], ['الأيدي', 'ايديها', 'بعضها', 'أيديها']],
+  ['يستطيع نحل العسل التعرّف على ___ البشر.', 'وجوه', ['أصوات', 'أسماء', 'أحذية'], ['الوجوه']],
+  ['الموزة منحنية لأنها تنمو باتجاه ___.', 'الشمس', ['الأرض', 'الجذع', 'المطر'], ['الضوء', 'ضوء الشمس']],
+  ['معظم الأكسجين الذي نتنفسه يأتي من ___.', 'المحيطات', ['الغابات الاستوائية', 'العشب', 'الجبال'], ['البحر', 'البحار', 'المحيط', 'العوالق', 'الطحالب']]
+];
+const QSETS = { en: QS_EN, ar: QS_AR };
+const COUNTS = [5, 8, 10, 15], TIMES = [30, 45, 60, 0];
+
+const LS = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+const SS = (() => { try { return window.sessionStorage; } catch (e) { return null; } })();
+function getItem(st, k) { try { const v = st && st.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function setItem(st, k, v) { try { if (!st) return; if (v == null) st.removeItem(k); else st.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const rid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+/* the same answer written two ways counts as one: case, spacing, punctuation, "the", Arabic alef/ya/ta marbuta and diacritics don't matter */
+function norm(s) {
+  let t = String(s == null ? '' : s).toLowerCase()
+    .replace(/[ً-ْـ]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  t = t.replace(/^(the|a|an) /, '').replace(/(^| )ال(?=\S\S)/g, '$1');
+  return t.replace(/ /g, '');
+}
+function cleanText(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, 40); }
+function fixOpts(o) { o = o || {}; return { lang: o.lang === 'ar' ? 'ar' : 'en', count: COUNTS.includes(+o.count) ? +o.count : 8, time: TIMES.includes(+o.time) ? +o.time : 45, dbl: o.dbl !== false && o.dbl !== 0 && o.dbl !== '0' }; }
+
+const me = (() => { let id = getItem(SS, 'fa-id'); if (!id) { id = rid(); setItem(SS, 'fa-id', id); } return id; })();
+let myName = getItem(LS, 'fa-name') || '';
+const onlineOK = !/claude|anthropic/i.test(location.hostname) && location.protocol !== 'data:';
+
+let role = null;      // 'solo' | 'host' | 'guest' | null
+let roomCode = '';
+let S = null;         // full game state (solo and host only)
+let V = null;         // what this screen shows
+let timer = null, token = 0;
+let pickFor = '', shownOver = null;
+let homeMsg = '', homeErr = false;
+let localDeadline = 0, localTotal = 0, clockIv = 0;
+
+/* ================= game engine (runs on the host / solo device) ================= */
+function newPlayer(id, name, bot) { return { id, name, bot: !!bot, online: true, score: 0, wins: 0, skill: bot ? 0.3 + Math.random() * 0.3 : 0 }; }
+function idxOf(pid) { return S.players.findIndex(p => p.id === pid); }
+function addLog(t) { S.log.push(t); if (S.log.length > 80) S.log.shift(); }
+function botName() { return BOT_NAMES.find(n => !S.players.some(p => p.name === n)) || 'Computer ' + (S.players.length + 1); }
+function watching() { return S.players.some(q => !q.bot && q.online); }
+function needs(i) { const p = S.players[i]; return p.bot || p.online; }
+function curQ() { return QSETS[S.lang][S.q]; }
+function isTrue(text, q) { const n = norm(text); return !!n && [q[1]].concat(q[3] || []).some(x => norm(x) === n); }
+
+function baseState(mode, opts) {
+  return { v: 1, mode, hostId: me, players: [], waiting: [], phase: 'lobby', opts: fixOpts(opts), game: 0, lang: 'en',
+    list: [], qi: 0, q: -1, fakes: {}, rej: {}, picks: {}, options: [], botAt: {}, deadline: 0, total: 0, reveal: null, used: { en: [], ar: [] }, log: [] };
+}
+function seatWaiting() {
+  while (S.waiting.length) {
+    const w = S.waiting[0];
+    if (S.players.length < MAX_PLAYERS) S.players.push(newPlayer(w.id, w.name, false));
+    else {
+      const b = S.players.map(p => p.bot).lastIndexOf(true);
+      if (b < 0) break;
+      S.players[b] = newPlayer(w.id, w.name, false);
+    }
+    S.players[S.players.length - 1].online = w.online !== false;
+    S.waiting.shift();
+  }
+}
+
+function newGame() {
+  seatWaiting();
+  S.game++;
+  S.lang = S.opts.lang;
+  S.players.forEach(p => { p.score = 0; });
+  const set = QSETS[S.lang], used = S.used[S.lang] || (S.used[S.lang] = []);
+  let pool = set.map((q, i) => i).filter(i => !used.includes(i));
+  if (pool.length < S.opts.count) { S.used[S.lang] = []; pool = set.map((q, i) => i); }
+  S.list = shuffle(pool).slice(0, S.opts.count);
+  S.qi = 0;
+  addLog(`Game ${S.game}: ${S.list.length} questions.`);
+  write();
+}
+function lastQ() { return S.qi + 1 >= S.list.length; }
+function mult() { return S.opts.dbl && lastQ() && S.list.length > 1 ? 2 : 1; }
+function setClock(secs) { S.total = secs * 1000; S.deadline = secs ? Date.now() + secs * 1000 : 0; }
+
+/* phase 1: everyone writes a fake answer */
+function write() {
+  token++; clearTimeout(timer);
+  S.q = S.list[S.qi];
+  S.used[S.lang].push(S.q);
+  S.phase = 'write'; S.fakes = {}; S.rej = {}; S.picks = {}; S.options = []; S.reveal = null;
+  setClock(S.opts.time);
+  const fast = !watching();
+  S.botAt = {};
+  S.players.forEach((p, i) => { if (p.bot) S.botAt[i] = Date.now() + (fast ? 40 : 3000 + Math.random() * Math.min(14000, (S.opts.time || 30) * 350)); });
+  step();
+}
+function botFake(i) {
+  const q = curQ();
+  const taken = new Set(Object.values(S.fakes).map(norm));
+  const free = shuffle(q[2]).filter(d => !taken.has(norm(d)));
+  return free[0] || null;
+}
+function doWrite(pi, text) {
+  if (S.phase !== 'write' || pi < 0 || S.fakes[pi] != null) return;
+  text = cleanText(text);
+  if (!text) return;
+  if (isTrue(text, curQ())) { S.rej[pi] = text; changed(); return; }
+  delete S.rej[pi];
+  S.fakes[pi] = text;
+  if (allWritten()) startPick(); else changed();
+}
+function allWritten() { return S.players.every((p, i) => !needs(i) || S.fakes[i] != null || (p.bot && S.botAt[i] == null)); }
+
+/* phase 2: the real answer hides among the fakes; everyone picks one */
+function startPick() {
+  token++; clearTimeout(timer);
+  const q = curQ();
+  const groups = new Map();
+  groups.set(norm(q[1]), { text: q[1], kind: 'truth', by: [] });
+  Object.keys(S.fakes).forEach(k => {
+    const pi = +k, t = S.fakes[k], n = norm(t);
+    if (groups.has(n)) { const g = groups.get(n); if (g.kind === 'fake') g.by.push(pi); }
+    else groups.set(n, { text: t, kind: 'fake', by: [pi] });
+  });
+  shuffle(q[2]).forEach(d => { if (groups.size < MIN_OPTIONS && !groups.has(norm(d))) groups.set(norm(d), { text: d, kind: 'house', by: [] }); });
+  S.options = shuffle([...groups.values()]);
+  S.phase = 'pick'; S.picks = {};
+  setClock(S.opts.time ? PICK_SECS : 0);
+  const fast = !watching();
+  S.botAt = {};
+  S.players.forEach((p, i) => { if (p.bot) S.botAt[i] = Date.now() + (fast ? 40 : 2500 + Math.random() * 9000); });
+  step();
+}
+function canPick(pi, k) { const o = S.options[k]; return !!o && !o.by.includes(pi); }
+function botPick(i) {
+  const p = S.players[i];
+  const ok = S.options.map((o, k) => k).filter(k => canPick(i, k));
+  const truth = S.options.findIndex(o => o.kind === 'truth');
+  if (Math.random() < p.skill) return truth;
+  return shuffle(ok)[0];
+}
+function doPick(pi, k) {
+  if (S.phase !== 'pick' || pi < 0 || S.picks[pi] != null) return;
+  k = +k;
+  if (!canPick(pi, k)) return;
+  S.picks[pi] = k;
+  if (allPicked()) reveal(); else changed();
+}
+function allPicked() { return S.players.every((p, i) => !needs(i) || S.picks[i] != null); }
+
+function schedule(fn, ms) {
+  clearTimeout(timer);
+  const t = token;
+  timer = setTimeout(() => { if (t === token) fn(); }, ms);
+}
+/* while a phase is open the host ticks: computer players, the clock, and "everyone is in" */
+function tick() {
+  const now = Date.now();
+  let moved = false;
+  if (S.phase === 'write') {
+    S.players.forEach((p, i) => {
+      if (!p.bot || S.fakes[i] != null || S.botAt[i] == null || now < S.botAt[i]) return;
+      const f = botFake(i);
+      if (f) S.fakes[i] = f; else delete S.botAt[i];
+      moved = true;
+    });
+    if (allWritten() || (S.deadline && now >= S.deadline)) { startPick(); return; }
+  } else if (S.phase === 'pick') {
+    S.players.forEach((p, i) => { if (p.bot && S.picks[i] == null && now >= S.botAt[i]) { S.picks[i] = botPick(i); moved = true; } });
+    if (allPicked() || (S.deadline && now >= S.deadline)) { reveal(); return; }
+  } else return;
+  if (moved) changed();
+  schedule(tick, 400);
+}
+function step() {
+  changed();
+  if (S.phase === 'write' || S.phase === 'pick') schedule(tick, 400);
+  else if (S.phase === 'reveal') schedule(() => { if (S.phase === 'reveal') next(); }, watching() ? REVEAL_MS + S.options.length * 900 : 400);
+}
+
+/* phase 3: points. Spot the truth: 2. Every player who picks your fake: 1 for you. The last question can count double. */
+function reveal() {
+  token++; clearTimeout(timer);
+  const m = mult();
+  const gained = {};
+  const add = (i, n) => { gained[i] = (gained[i] || 0) + n; S.players[i].score += n; };
+  const pickers = S.options.map(() => []);
+  Object.keys(S.picks).forEach(k => { const pi = +k, o = S.picks[k]; if (S.options[o]) pickers[o].push(pi); });
+  S.options.forEach((o, k) => {
+    pickers[k].forEach(pi => {
+      if (o.kind === 'truth') add(pi, 2 * m);
+      else if (o.kind === 'fake') o.by.forEach(a => add(a, 1 * m));
+    });
+  });
+  S.reveal = { pickers, gained, mult: m, missedPick: S.players.map((p, i) => i).filter(i => S.picks[i] == null) };
+  S.phase = 'reveal';
+  const truth = S.options.findIndex(o => o.kind === 'truth');
+  const best = S.options.map((o, k) => ({ o, n: pickers[k].length })).filter(x => x.o.kind === 'fake' && x.n).sort((a, b) => b.n - a.n)[0];
+  addLog(`Q${S.qi + 1}: ${curQ()[1]}. ${pickers[truth].length ? pickers[truth].map(i => S.players[i].name).join(', ') + ' spotted it.' : 'Nobody spotted it.'}${best ? ` Best fake: "${best.o.text}" by ${best.o.by.map(i => S.players[i].name).join(' and ')}.` : ''}`);
+  if (lastQ()) {
+    S.phase = 'over';
+    const top = Math.max(...S.players.map(p => p.score));
+    S.players.forEach(p => { if (p.score === top) p.wins = (p.wins || 0) + 1; });
+    addLog(`Game over! ${S.players.filter(p => p.score === top).map(p => p.name).join(' and ')} wins with ${top} points.`);
+  }
+  step();
+}
+function next() {
+  if (S.phase !== 'reveal') return;
+  S.qi++;
+  write();
+}
+
+function handleAct(pid, act, data) {
+  if (!S) return;
+  data = data || {};
+  const pi = idxOf(pid);
+  const isHost = pid === S.hostId;
+  if (act === 'write') { doWrite(pi, data.text); return; }
+  if (act === 'pick') { doPick(pi, data.k); return; }
+  if (!isHost) return;
+  if (act === 'addBot') {
+    if (S.phase !== 'lobby' || S.players.length >= MAX_PLAYERS) return;
+    S.players.push(newPlayer('bot-' + rid(), botName(), true));
+    changed();
+  } else if (act === 'remove') {
+    if (S.phase !== 'lobby' || data.id === S.hostId) return;
+    const i = idxOf(data.id);
+    if (i < 0) return;
+    S.players.splice(i, 1);
+    conns.forEach(c => { if (c.pid === data.id) { try { c.send({ t: 'kicked' }); } catch (e) { /* gone */ } } });
+    changed();
+  } else if (act === 'settings') {
+    if (S.phase !== 'lobby') return;
+    S.opts = fixOpts(data);
+    changed();
+  } else if (act === 'start') {
+    if (S.phase !== 'lobby' || S.players.length < MIN_PLAYERS) return;
+    newGame();
+  } else if (act === 'next') {
+    if (S.phase === 'reveal') next();
+    else if (S.phase === 'over') newGame();
+  } else if (act === 'close') {
+    if (S.phase === 'write') startPick();
+    else if (S.phase === 'pick') reveal();
+  } else if (act === 'lobby') {
+    if (S.phase !== 'over') return;
+    seatWaiting();
+    S.phase = 'lobby';
+    changed();
+  }
+}
+
+/* while writing you only see who is done; while picking you see the answers but not who wrote them */
+function viewFor(pid) {
+  const idx = S.players.findIndex(p => p.id === pid);
+  const ph = S.phase;
+  const v = JSON.parse(JSON.stringify({ mode: S.mode, phase: ph, opts: S.opts, game: S.game, qi: S.qi, total: S.list.length, lang: S.lang,
+    log: S.log, hostId: S.hostId, waiting: S.waiting.map(w => w.name) }));
+  v.me = idx;
+  const q = S.q >= 0 ? QSETS[S.lang][S.q] : null;
+  v.question = q ? q[0] : '';
+  v.mult = ph === 'lobby' ? 1 : mult();
+  v.left = (ph === 'write' || ph === 'pick') && S.deadline ? Math.max(0, S.deadline - Date.now()) : 0;
+  v.clockTotal = S.total;
+  v.players = S.players.map((p, i) => ({ id: p.id, name: p.name, bot: p.bot, online: p.online, score: p.score, wins: p.wins || 0,
+    done: ph === 'write' ? S.fakes[i] != null : ph === 'pick' ? S.picks[i] != null : false }));
+  v.mine = idx >= 0 && S.fakes[idx] != null ? S.fakes[idx] : null;
+  v.rej = idx >= 0 && S.rej[idx] ? S.rej[idx] : '';
+  if (ph === 'pick') {
+    v.options = S.options.map(o => ({ text: o.text, own: o.by.includes(idx) }));
+    v.myPick = idx >= 0 && S.picks[idx] != null ? S.picks[idx] : null;
+  } else if ((ph === 'reveal' || ph === 'over') && S.reveal) {
+    v.options = JSON.parse(JSON.stringify(S.options));
+    v.reveal = JSON.parse(JSON.stringify(S.reveal));
+    v.answer = q ? q[1] : '';
+    v.myPick = idx >= 0 && S.picks[idx] != null ? S.picks[idx] : null;
+  }
+  return v;
+}
+
+/* Game Night: who placed where when a match ends (null while it is still going) */
+function nightRank() {
+  const by = vals => { const d = [...new Set(vals)].sort((a, b) => b - a); return S.players.map((p, i) => ({ name: p.name, bot: !!p.bot, place: d.indexOf(vals[i]) })); };
+  return S.phase === 'over' ? by(S.players.map(p => p.score)) : null;
+}
+function changed() {
+  if (role === 'host') broadcast();
+  if (role === 'host' && window.GN) GN.report(nightRank());
+  if (role === 'host' || role === 'solo') {
+    V = viewFor(me);
+    if (role === 'solo') setItem(LS, 'fa-solo', S);
+    else setItem(LS, 'fa-host', { code: roomCode, S });
+  }
+  render();
+}
+
+/* ================= networking (host-authoritative rooms) =================
+   A direct phone-to-phone link (PeerJS) is tried first. Public MQTT relays carry the same
+   messages as a backup when a network blocks the direct link. */
+const PEER_PREFIX = 'gamenight-fake-room-';
+const RELAYS = [
+  ['wss://public.cloud.shiftr.io:443', { username: 'public', password: 'public' }],
+  ['wss://broker.hivemq.com:8884/mqtt', {}],
+  ['wss://broker.emqx.io:8084/mqtt', {}]
+];
+const RELAY_ROOT = 'gamenight-fake-v1/';
+let peer = null, hostConn = null, link = null, everConnected = false;
+const conns = new Set(), relayConns = new Map();
+let stateSeq = 0, hostSess = '', lastState = { hs: null, sv: 0 };
+let fallbackTimer = 0, giveUpTimer = 0, retryTimer = 0, helloIv = 0, beatIv = 0, lastHostMsg = 0;
+const relay = { clients: [], seq: 0, sess: '', seen: new Map() };
+
+function netReady() { return typeof Peer !== 'undefined' || typeof mqtt !== 'undefined'; }
+let netWait = false;
+function waitNet(fn) { if (window.NET_DONE) return false; if (!netWait) { netWait = true; NET.then(() => { netWait = false; fn(); }); } return true; }
+function newCode() { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
+function peerIdFor(code) { return PEER_PREFIX + code.toLowerCase(); }
+function roomTopic(rest) { return 'room/' + roomCode.toLowerCase() + '/' + rest; }
+let netText = '', netWarn = false;
+function setNet(text, warn) { netText = text || ''; netWarn = !!warn; renderNet(); }
+
+function relayStart(listen, onMsg) {
+  relayStop();
+  if (typeof mqtt === 'undefined') return;
+  relay.sess = Math.random().toString(36).slice(2, 8);
+  const topic = RELAY_ROOT + listen;
+  relay.clients = RELAYS.map(([url, o]) => {
+    let c;
+    try { c = mqtt.connect(url, Object.assign({}, o, { clientId: 'fa-' + me + '-' + Math.random().toString(36).slice(2, 6), connectTimeout: 10000, reconnectPeriod: 4000, keepalive: 30 })); }
+    catch (e) { return null; }
+    c.on('connect', () => c.subscribe(topic));
+    c.on('message', (t, buf) => {
+      let env; try { env = JSON.parse(buf.toString()); } catch (e) { return; }
+      if (!env || !env.id || env.f === me || relay.seen.has(env.id)) return;
+      relay.seen.set(env.id, 1);
+      if (relay.seen.size > 600) relay.seen.delete(relay.seen.keys().next().value);
+      onMsg(env.m, String(env.f || ''));
+    });
+    c.on('error', () => {});
+    return c;
+  }).filter(Boolean);
+}
+function relaySend(to, m) {
+  const env = JSON.stringify({ f: me, id: me + '.' + relay.sess + '.' + (++relay.seq), m });
+  relay.clients.forEach(c => { if (c.connected) { try { c.publish(RELAY_ROOT + to, env); } catch (e) { /* skip */ } } });
+}
+function relayStop() {
+  relay.clients.forEach(c => { try { c.end(true); } catch (e) { /* skip */ } });
+  relay.clients = []; relay.seen.clear();
+}
+
+/* ---- host ---- */
+function broadcast() {
+  const sv = ++stateSeq;
+  conns.forEach(c => { if (c.open && c.pid) { try { c.send({ t: 'state', v: viewFor(c.pid), hs: hostSess, sv }); } catch (e) { /* dropped */ } } });
+}
+function startHostRelay() {
+  relayConns.clear();
+  relayStart(roomTopic('host'), (m, f) => {
+    if (role !== 'host' || !m || !f) return;
+    let c = relayConns.get(f);
+    if (!c) {
+      if (m.t !== 'hello') return;
+      c = { relay: true, from: f, pid: null, open: true, seen: 0, send: x => relaySend(roomTopic('g/' + f), x), close() { this.open = false; } };
+      relayConns.set(f, c);
+    }
+    c.seen = Date.now();
+    if (m.t !== 'ping') hostReceive(c, m);
+  });
+  clearInterval(beatIv);
+  /* every guest pings every 5s; anyone silent for 15-20s is treated as gone, and the computer covers their turns */
+  beatIv = setInterval(() => {
+    const now = Date.now();
+    relayConns.forEach((c, f) => { if (now - c.seen > 20000) { relayConns.delete(f); c.open = false; hostDrop(c); } });
+    conns.forEach(c => {
+      if (!c.relay && c.seen && now - c.seen > 15000) { try { c.close(); } catch (e) { /* skip */ } hostDrop(c); }
+      else { try { c.send({ t: 'ping' }); } catch (e) { /* skip */ } }
+    });
+  }, 5000);
+}
+function openHostPeer(attempt) {
+  attempt = attempt || 0;
+  if (typeof Peer === 'undefined') { setNet('Room open · backup link'); return; }
+  setNet('Opening room…', true);
+  peer = new Peer(peerIdFor(roomCode), { debug: 1 });
+  peer.on('open', () => setNet('Room open'));
+  peer.on('connection', c => {
+    c.on('data', m => hostReceive(c, m));
+    c.on('close', () => hostDrop(c));
+    c.on('error', () => hostDrop(c));
+  });
+  peer.on('disconnected', () => { setNet('Reconnecting…', true); setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && attempt < 12) {
+      setNet('Reopening room…', true);
+      try { peer.destroy(); } catch (x) { /* skip */ }
+      setTimeout(() => { if (role === 'host') openHostPeer(attempt + 1); }, 3000);
+    } else if (e.type !== 'peer-unavailable') setNet('Connection problem (' + e.type + ')', true);
+  });
+}
+function hostReceive(c, m) {
+  if (!m || typeof m !== 'object' || !S) return;
+  c.seen = Date.now();
+  if (m.t === 'ping') return;
+  if (m.t === 'away' && c.pid) {
+    conns.delete(c);
+    const p = S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+    return;
+  }
+  if (m.t === 'hello') {
+    const pid = String(m.cid || '').slice(0, 24);
+    if (!pid || pid === S.hostId) { try { c.close(); } catch (e) { /* skip */ } return; }
+    const name = String(m.name || '').trim().slice(0, 14) || 'Player';
+    c.pid = pid; conns.add(c);
+    let p = S.players.find(x => x.id === pid);
+    if (!p) {
+      p = S.players.find(x => !x.bot && !x.online && x.id !== S.hostId && x.name.toLowerCase() === name.toLowerCase());
+      if (p) p.id = pid;
+    }
+    if (p) { p.name = name; p.online = true; afterPresence(); return; }
+    const w = S.waiting.find(x => x.id === pid);
+    if (w) { w.name = name; w.online = true; changed(); return; }
+    if (S.phase === 'lobby') {
+      if (S.players.length < MAX_PLAYERS) S.players.push(newPlayer(pid, name, false));
+      else {
+        const b = S.players.map(x => x.bot).lastIndexOf(true);
+        if (b < 0) { try { c.send({ t: 'full' }); } catch (e) { /* skip */ } conns.delete(c); return; }
+        S.players[b] = newPlayer(pid, name, false);
+      }
+    } else S.waiting.push({ id: pid, name, online: true });
+    addLog(`${name} joined the room.`);
+    changed();
+    return;
+  }
+  if (m.t === 'bye' && c.pid) {
+    const i = idxOf(c.pid);
+    if (S.phase === 'lobby' && i >= 0) S.players.splice(i, 1);
+    S.waiting = S.waiting.filter(w => w.id !== c.pid);
+    conns.delete(c);
+    if (S.phase !== 'lobby' && i >= 0 && S.players[i] && S.players[i].id === c.pid) { S.players[i].online = false; afterPresence(); return; }
+    changed();
+    return;
+  }
+  if (m.t === 'act' && c.pid) handleAct(c.pid, String(m.act), m.data);
+}
+function hostDrop(c) {
+  if (!conns.has(c)) return;
+  conns.delete(c);
+  if (c.pid && ![...conns].some(x => x.pid === c.pid)) {
+    const p = S && S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S && S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+  }
+}
+function afterPresence() {
+  if (!S) return;
+  step();
+}
+function normalizeHost() {
+  S.players.forEach(p => { if (!p.bot) p.online = p.id === me; });
+  S.waiting.forEach(w => { w.online = false; });
+  token++; clearTimeout(timer);
+  if (S.phase !== 'lobby') step();
+}
+
+/* ---- guest ---- */
+function joinRoom(code) {
+  role = 'guest'; roomCode = code; V = null; everConnected = false; link = null; lastState = { hs: null, sv: 0 };
+  homeMsg = 'Connecting to room ' + code + '…'; homeErr = false;
+  render();
+  setNet('Connecting…', true);
+  relayStart(roomTopic('g/' + me), guestRelayMsg);
+  clearTimeout(fallbackTimer); fallbackTimer = setTimeout(useRelay, 4000);
+  clearTimeout(giveUpTimer);
+  giveUpTimer = setTimeout(() => {
+    if (role === 'guest' && !everConnected) leave(`Couldn't reach room ${code}. Check the code, and that the host still has the game open.`);
+  }, 25000);
+  clearInterval(beatIv);
+  beatIv = setInterval(() => {
+    if (role !== 'guest' || !link || !hostConn) return;
+    try { hostConn.send({ t: 'ping' }); } catch (e) { /* skip */ }
+    if (Date.now() - lastHostMsg > 16000) {
+      setNet('Lost the host. Reconnecting…', true);
+      if (link === 'relay') hostConn.send({ t: 'hello', cid: me, name: myName });
+      else { link = null; hostConn = null; lastHostMsg = Date.now(); retryLater(); useRelay(); }
+    }
+  }, 5000);
+  if (typeof Peer === 'undefined') { useRelay(); return; }
+  peer = new Peer({ debug: 1 });
+  peer.on('open', connectHost);
+  peer.on('disconnected', () => { setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (link === 'relay') return;
+    useRelay();
+    setNet(e.type === 'peer-unavailable' ? (everConnected ? 'Host not reachable. Retrying…' : 'Trying another way to reach the room…') : 'Connection problem. Retrying…', true);
+    retryLater();
+  });
+}
+function linked(how) {
+  everConnected = true; link = how; clearTimeout(giveUpTimer); lastHostMsg = Date.now();
+  setNet('Connected' + (how === 'relay' ? ' · backup link' : ''));
+  setItem(LS, 'fa-guest', { code: roomCode });
+}
+function useRelay() {
+  if (role !== 'guest' || link === 'peer' || helloIv) return;
+  const hello = () => {
+    if (role !== 'guest' || link) { clearInterval(helloIv); helloIv = 0; return; }
+    relaySend(roomTopic('host'), { t: 'hello', cid: me, name: myName });
+  };
+  helloIv = setInterval(hello, 2000); hello();
+}
+function relayHostConn() { return { relay: true, open: true, send: m => relaySend(roomTopic('host'), m) }; }
+function guestRelayMsg(m) {
+  if (role !== 'guest' || !m) return;
+  lastHostMsg = Date.now();
+  if (m.t !== 'state' && m.t !== 'full' && m.t !== 'kicked' && m.t !== 'closed') return;
+  if (m.t === 'state' && link !== 'peer' && link !== 'relay') { hostConn = relayHostConn(); linked('relay'); }
+  else if (link === 'relay') setNet('Connected · backup link');
+  if (link === 'relay' || m.t !== 'state') guestMsg(m);
+}
+function guestMsg(m) {
+  if (!m) return;
+  if (m.t === 'full') { leave('That room is full. Rooms hold 8 players.'); return; }
+  if (m.t === 'kicked') { leave('The host removed you from the room.'); return; }
+  if (m.t === 'closed') { leave('The host closed the room.'); return; }
+  if (m.t !== 'state') return;
+  if (m.hs === lastState.hs && m.sv <= lastState.sv) return;
+  lastState = { hs: m.hs, sv: m.sv };
+  V = m.v;
+  render();
+}
+function connectHost() {
+  if (!peer || peer.destroyed || role !== 'guest') return;
+  const c = peer.connect(peerIdFor(roomCode), { reliable: true });
+  if (!link) hostConn = c;
+  c.on('open', () => { hostConn = c; c.send({ t: 'hello', cid: me, name: myName }); linked('peer'); });
+  c.on('data', m => { if (link === 'peer' && hostConn === c) { lastHostMsg = Date.now(); guestMsg(m); } });
+  c.on('close', () => {
+    if (role === 'guest' && hostConn === c) { link = null; hostConn = null; setNet('Lost the host. Reconnecting…', true); retryLater(); useRelay(); }
+  });
+}
+function retryLater() {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (!peer || peer.destroyed || role !== 'guest') return;
+    if (peer.disconnected) { try { peer.reconnect(); } catch (e) { /* skip */ } setTimeout(connectHost, 1500); }
+    else connectHost();
+  }, 2500);
+}
+
+/* ---- shared ---- */
+function act(name, data) {
+  if (role === 'guest') { if (hostConn && hostConn.open) hostConn.send({ t: 'act', act: name, data }); }
+  else if (S) handleAct(me, name, data);
+}
+
+function leave(msg) {
+  if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'bye' }); } catch (e) { /* skip */ } }
+  if (role === 'host') conns.forEach(c => { try { c.send({ t: 'closed' }); } catch (e) { /* skip */ } });
+  token++; clearTimeout(timer);
+  clearTimeout(retryTimer); clearTimeout(fallbackTimer); clearTimeout(giveUpTimer); clearInterval(helloIv); clearInterval(beatIv); helloIv = 0;
+  const p = peer; setTimeout(() => { try { p && p.destroy(); } catch (e) { /* skip */ } }, 300);
+  setTimeout(relayStop, 300);
+  relayConns.clear(); conns.clear(); link = null; peer = null; hostConn = null;
+  if (role === 'host') setItem(LS, 'fa-host', null);
+  if (role === 'guest') setItem(LS, 'fa-guest', null);
+  role = null; S = null; V = null; roomCode = ''; pickFor = ''; shownOver = null;
+  homeMsg = msg || ''; homeErr = !!msg;
+  setNet('');
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  closeModal();
+  render();
+}
+
+/* ================= rendering ================= */
+function myPlayer() { return V && V.me >= 0 ? V.players[V.me] : null; }
+function isRoomHost() { return role === 'host' || role === 'solo'; }
+function myTurn() { return !!(V && V.me >= 0 && ((V.phase === 'write' && V.mine == null) || (V.phase === 'pick' && V.myPick == null))); }
+function dirAttr() { return V && V.lang === 'ar' ? ' dir="rtl"' : ''; }
+function qHTML(text, fill) {
+  const parts = esc(text).split('___');
+  return parts.join(fill != null ? `<span class="fill">${esc(fill)}</span>` : '<span class="blank">&nbsp;</span>');
+}
+
+function render() {
+  const screen = !role || (role === 'guest' && !V) ? 'home' : V && V.phase === 'lobby' ? 'lobby' : 'game';
+  if (screen !== 'game') { document.title = 'Fake Answers · Game Night'; wasMyTurn = false; if (screen === 'home' && wakeLock) { try { wakeLock.release(); } catch (e) { /* skip */ } wakeLock = null; } }
+  $('home').hidden = screen !== 'home';
+  $('lobby').hidden = screen !== 'lobby';
+  $('app').hidden = screen !== 'game';
+  if (screen === 'home') renderHome();
+  else if (screen === 'lobby') renderLobby();
+  else renderGame();
+}
+
+function renderNet() {
+  const el = $('net');
+  el.textContent = role === 'host' || role === 'guest' ? `· Room ${roomCode} · ${netText}` : '';
+  el.className = 'net' + (netWarn ? ' warn' : '');
+  $('lNet').textContent = netText || ' ';
+}
+
+function renderHome() {
+  if (document.activeElement !== $('hName') && !$('hName').value) $('hName').value = myName;
+  $('onlineBox').hidden = !onlineOK;
+  $('onlineNote').hidden = onlineOK;
+  const savedHost = getItem(LS, 'fa-host');
+  $('hReopen').hidden = !(savedHost && savedHost.code && role !== 'guest');
+  if (savedHost && savedHost.code) $('hReopen').textContent = `Reopen your room ${savedHost.code}`;
+  const solo = getItem(LS, 'fa-solo');
+  $('hContinue').hidden = !(solo && solo.v === 1 && solo.phase !== 'lobby' && solo.phase !== 'over');
+  $('hCreate').disabled = $('hJoin').disabled = role === 'guest';
+  const m = $('homeMsg');
+  m.textContent = homeMsg; m.className = 'msg' + (homeErr ? ' err' : '');
+}
+
+function shareLink() { return location.origin + location.pathname + '#' + roomCode; }
+
+function renderLobby() {
+  renderNet();
+  $('lCode').textContent = roomCode;
+  $('lLink').textContent = shareLink();
+  $('lCopy').textContent = navigator.share ? 'Share link' : 'Copy link';
+  const host = role === 'host';
+  const n = V.players.length;
+  $('lCount').textContent = `Players (${n} of ${MAX_PLAYERS})`;
+  $('lPlayers').innerHTML = V.players.map(p => {
+    const dot = p.bot ? 'cpu' : p.online ? '' : 'off';
+    const tag = p.id === V.hostId ? 'Host' : p.bot ? 'Computer' : p.online ? '' : 'Away';
+    const rm = host && p.id !== V.hostId ? `<button class="x" type="button" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">Remove</button>` : '';
+    return `<li><span class="dot ${dot}" aria-hidden="true"></span><span class="nm">${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><span class="note">${tag}</span>${rm}</li>`;
+  }).join('') + (V.waiting.length ? `<li><span class="nm note">Waiting: ${esc(V.waiting.join(', '))}</span></li>` : '');
+  $('lLangSel').value = V.opts.lang; $('lCountSel').value = String(V.opts.count); $('lTimeSel').value = String(V.opts.time); $('lDoubleSel').value = V.opts.dbl ? '1' : '0';
+  ['lLangSel', 'lCountSel', 'lTimeSel', 'lDoubleSel'].forEach(id => { $(id).disabled = !host; });
+  $('lHost').hidden = !host;
+  $('lAddBot').disabled = n >= MAX_PLAYERS;
+  $('lStart').disabled = n < MIN_PLAYERS;
+  $('lNote').textContent = host
+    ? (n < 3 ? 'Best with 3 or more. Share the code, or add computer players.' : 'Ready when you are. More friends can still join with the code.')
+    : `Waiting for the host to start. ${V.opts.count} questions in ${V.opts.lang === 'ar' ? 'Arabic' : 'English'}, ${V.opts.time ? V.opts.time + ' seconds to write' : 'no time limit'}.`;
+}
+
+let lastQKey = '';
+function renderGame() {
+  if (!V) return;
+  renderNet();
+  if (V.phase !== 'over' && $('sheet').dataset.kind === 'results') closeModal();
+  $('roundNo').textContent = `Question ${Math.min(V.qi + 1, V.total)} of ${V.total}`;
+  if (V.phase === 'write' || V.phase === 'pick') {
+    localDeadline = V.left ? Date.now() + V.left : 0; localTotal = V.clockTotal || 1;
+    if (!clockIv) clockIv = setInterval(drawClock, 250);
+  } else { clearInterval(clockIv); clockIv = 0; }
+  renderPeople();
+  renderStage();
+  renderAct();
+  renderLog();
+  turnSignal(); keepAwake();
+  if (V.phase === 'over' && shownOver !== V.game) {
+    shownOver = V.game;
+    setTimeout(() => { if (V && V.phase === 'over' && $('modal').hidden) openResults(); }, 6000);
+  }
+}
+
+function renderPeople() {
+  const open = V.phase === 'write' || V.phase === 'pick';
+  $('people').innerHTML = V.players.map((p, i) => {
+    const gain = V.reveal && V.reveal.gained[i];
+    const t = open ? (p.done ? 'In' : p.bot ? 'Thinking' : !p.online ? 'Away' : '…') : gain ? '+' + gain : p.bot ? 'CPU' : !p.online ? 'Away' : i === V.me ? 'You' : '';
+    return `<div class="who${open && p.done ? ' done' : ''}${i === V.me ? ' me' : ''}"><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span><span class="t">${t || '&nbsp;'}</span></div>`;
+  }).join('');
+}
+
+function drawClock() {
+  const el = $('clock');
+  if (!el || !V || !(V.phase === 'write' || V.phase === 'pick') || !localDeadline) return;
+  const left = Math.max(0, localDeadline - Date.now());
+  const s = Math.ceil(left / 1000);
+  el.style.setProperty('--p', Math.min(1, left / localTotal));
+  el.classList.toggle('low', s <= 5);
+  el.querySelector('span').textContent = s;
+}
+
+function renderStage() {
+  const el = $('stage');
+  const head = `<div class="qno">Question ${V.qi + 1} of ${V.total}${V.mult > 1 ? ' · double points' : ''}</div>`;
+  const qKey = V.game + '-' + V.qi + '-' + V.phase + '-' + (V.phase === 'pick' ? V.myPick : '');
+  if (V.phase === 'write' || V.phase === 'pick') {
+    if (lastQKey === qKey && $('clock')) { drawClock(); return; }
+    lastQKey = qKey;
+    const clock = V.left ? '<div class="clock" id="clock"><span></span></div>' : '';
+    if (V.phase === 'write') {
+      el.innerHTML = `${head}<div class="question"${dirAttr()}>${qHTML(V.question)}</div>${clock}`;
+    } else {
+      const canPick = V.me >= 0 && V.myPick == null;
+      const opts = V.options.map((o, k) => `<button class="opt${o.own ? ' own' : ''}${V.myPick === k ? ' picked' : ''}" type="button" data-pick="${k}"${dirAttr()}${!canPick || o.own ? ' disabled' : ''}>${esc(o.text)}${o.own ? '<small>yours</small>' : ''}</button>`).join('');
+      el.innerHTML = `${head}<div class="question" style="font-size:20px"${dirAttr()}>${qHTML(V.question)}</div>${clock}<div class="opts">${opts}</div>`;
+    }
+    drawClock();
+    return;
+  }
+  if (lastQKey === qKey) return;
+  lastQKey = qKey;
+  const r = V.reveal;
+  if (!r) { el.innerHTML = ''; return; }
+  const names = list => list.map(i => `<b>${esc(V.players[i].name)}</b>`).join(', ');
+  /* fakes first, the truth last */
+  const order = V.options.map((o, k) => k).sort((a, b) => (V.options[a].kind === 'truth') - (V.options[b].kind === 'truth') || r.pickers[b].length - r.pickers[a].length);
+  const rows = order.map((k, n) => {
+    const o = V.options[k], who = r.pickers[k];
+    const mine = o.by.includes(V.me) || V.myPick === k;
+    const tag = o.kind === 'truth' ? 'The truth' : o.kind === 'house' ? 'Our fake' : 'Fake by ' + o.by.map(i => V.players[i].name).join(' & ');
+    const by = who.length ? `Picked by ${names(who)}` : 'Nobody picked this';
+    const pts = o.kind === 'truth' && who.length ? ` · <span class="gain">+${2 * r.mult} each</span>` : o.kind === 'fake' && who.length ? ` · <span class="gain">+${who.length * r.mult} to ${esc(o.by.map(i => V.players[i].name).join(' & '))}</span>` : '';
+    return `<li class="${o.kind === 'truth' ? 'truth' : ''}${mine ? ' mine' : ''}" style="animation-delay:${n * 0.5}s"><div class="ans"><span${dirAttr()}>${esc(o.text)}</span><span class="tag">${esc(tag)}</span></div><div class="by">${by}${pts}</div></li>`;
+  }).join('');
+  el.innerHTML = `${head}<div class="question" style="font-size:20px"${dirAttr()}>${qHTML(V.question, V.answer)}</div><ol class="reveal-list">${rows}</ol>`;
+}
+
+function renderAct() {
+  const host = isRoomHost();
+  let status = '', sub = '', more = '', form = false;
+  if (V.phase === 'write') {
+    const n = V.players.filter(p => p.done).length;
+    if (V.me < 0) { status = 'Everyone is writing.'; sub = 'You join when the next game starts.'; }
+    else if (V.mine == null) {
+      status = V.rej ? `"${V.rej}" is the real answer!` : 'Write a fake answer.';
+      sub = V.rej ? 'Keep it secret, and write a fake one instead.' : 'Make it sound true, so the others pick it.';
+      form = true;
+    } else { status = `Your fake: "${V.mine}"`; sub = `${n} of ${V.players.length} are done. Waiting for the others…`; }
+    if (role === 'host' && V.mine != null) more = '<div class="actions"><button class="btn" type="button" id="aClose">Stop writing now</button></div>';
+  } else if (V.phase === 'pick') {
+    const n = V.players.filter(p => p.done).length;
+    if (V.me < 0) { status = 'Everyone is picking.'; sub = ''; }
+    else if (V.myPick == null) { status = 'Which one is the truth?'; sub = 'Tap the answer you think is real. You can\'t pick your own.'; }
+    else { status = 'Locked in.'; sub = `${n} of ${V.players.length} have picked. Waiting for the others…`; }
+    if (role === 'host' && V.myPick != null) more = '<div class="actions"><button class="btn" type="button" id="aClose">Show the answers now</button></div>';
+  } else if (V.phase === 'reveal') {
+    const g = V.reveal.gained[V.me] || 0;
+    const truth = V.options.findIndex(o => o.kind === 'truth');
+    const fooled = V.options.filter(o => o.kind === 'fake' && o.by.includes(V.me)).reduce((a, o) => a + V.reveal.pickers[V.options.indexOf(o)].length, 0);
+    status = V.me < 0 ? 'The answers are in.' : V.myPick === truth ? `You spotted the truth! +${g}` : fooled ? `You fooled ${fooled}! +${g}` : V.myPick == null ? 'No pick this time.' : 'You got fooled!';
+    sub = 'Next question in a moment.';
+    if (host) more = '<div class="actions"><button class="btn primary" type="button" id="aNext">Next question</button></div>';
+  } else if (V.phase === 'over') {
+    const top = Math.max(...V.players.map(p => p.score));
+    const w = V.players.filter(p => p.score === top);
+    status = w.some(p => p.id === me) ? (w.length > 1 ? 'You share the win!' : 'You win the game!') : `${w.map(p => p.name).join(' and ')} win${w.length > 1 ? '' : 's'}!`;
+    sub = `${top} points.` + (host ? '' : ' The host starts the next game.');
+    more = `<div class="actions"><button class="btn" type="button" id="aResults">Final scores</button>${host ? '<button class="btn primary" type="button" id="aNew">New game</button>' : ''}</div>`;
+  }
+  $('act').classList.toggle('mine', form || (V.phase === 'pick' && V.me >= 0 && V.myPick == null));
+  $('status').textContent = status;
+  $('sub').textContent = sub;
+  const wasHidden = $('writeForm').hidden;
+  $('writeForm').hidden = !form;
+  if (form) {
+    $('writeSend').disabled = false;
+    $('writeIn').dir = V.lang === 'ar' ? 'rtl' : 'auto';
+    $('writeIn').placeholder = V.lang === 'ar' ? 'إجابتك المزيفة' : 'Your fake answer';
+    if (wasHidden) { if (!V.rej) $('writeIn').value = ''; if (window.matchMedia('(hover: hover)').matches) setTimeout(() => $('writeIn').focus(), 0); }
+  }
+  $('actMore').innerHTML = more;
+}
+
+let wasMyTurn = false, wakeLock = null;
+function turnSignal() {
+  const mine = myTurn();
+  document.title = mine ? 'Your turn · Fake Answers' : 'Fake Answers · Game Night';
+  if (mine && !wasMyTurn && role !== 'solo') { try { navigator.vibrate && navigator.vibrate(80); } catch (e) { /* not supported */ } }
+  wasMyTurn = mine;
+}
+function keepAwake() {
+  const want = !!(V && V.phase !== 'lobby') && document.visibilityState === 'visible';
+  if (want && !wakeLock && navigator.wakeLock) {
+    navigator.wakeLock.request('screen').then(l => { wakeLock = l; l.addEventListener('release', () => { wakeLock = null; }); }).catch(() => {});
+  } else if (!want && wakeLock) { try { wakeLock.release(); } catch (e) { /* skip */ } wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+function renderLog() {
+  const log = V.log || [];
+  $('logLast').textContent = log.length ? log[log.length - 1] : 'Game log';
+  $('logList').innerHTML = log.slice().reverse().map(t => `<li>${esc(t)}</li>`).join('');
+  $('logList').setAttribute('start', log.length);
+}
+
+/* ================= modals ================= */
+function openModal(html, kind) { $('sheet').innerHTML = html; $('sheet').dataset.kind = kind || ''; $('modal').hidden = false; const f = $('sheet').querySelector('button, input, select'); if (f && kind !== 'results') f.focus(); }
+function closeModal() { $('modal').hidden = true; $('sheet').innerHTML = ''; $('sheet').dataset.kind = ''; }
+
+function openRules() {
+  openModal(`<h2>How to <span>play</span></h2>
+  <p class="lede">Every question is a strange but true fact with one part missing.</p>
+  <ul class="rules">
+    <li><b>Write.</b> Make up a fake answer that sounds believable. If you write the real answer by accident, you're told to write another one.</li>
+    <li><b>Pick.</b> Your fakes and the real answer are mixed together. Tap the one you think is true. You can't pick your own.</li>
+    <li><b>Points.</b> Spot the truth: 2 points. Every player who picks your fake: 1 point for you.</li>
+    <li><b>Same fake.</b> If two players write the same fake, it shows once and both get the points.</li>
+    <li><b>Our fakes.</b> With few players, the game adds a fake or two of its own, so there are always at least 4 answers to pick from.</li>
+    <li><b>Last question.</b> Counts double, unless the host turns that off.</li>
+    <li><b>Online rooms.</b> One phone creates a room and shares the 4-letter code. 2 to 8 players, best with 3 or more. English or Arabic questions.</li>
+  </ul>
+  <div class="sheet-actions"><button class="btn primary" type="button" data-close>Got it</button></div>`);
+}
+function rankedOrder() { return V.players.map((p, i) => i).sort((a, b) => V.players[b].score - V.players[a].score); }
+function openResults() {
+  if (!V || V.phase !== 'over') return;
+  const order = rankedOrder();
+  const top = V.players[order[0]].score;
+  const winners = order.filter(i => V.players[i].score === top);
+  const host = isRoomHost();
+  const btns = host
+    ? `<button class="btn" type="button" data-close>Look at the answers</button>${role === 'host' ? '<button class="btn" type="button" id="mLobby">Back to lobby</button>' : ''}<button class="btn primary" type="button" id="mNew">New game</button>`
+    : `<button class="btn primary" type="button" data-close>Close</button>`;
+  openModal(`<h2>${winners.includes(V.me) ? 'You <span>win!</span>' : esc(winners.map(i => V.players[i].name).join(' & ')) + ' <span>win' + (winners.length > 1 ? '' : 's') + '</span>'}</h2>
+    <p class="lede">Final scores after ${V.total} questions.${host ? '' : ' The host starts the next game.'}</p>
+    <ol class="order">${order.map((i, k) => { const p = V.players[i]; return `<li class="${i === V.me ? 'me-row' : ''}"><span class="pl">${k + 1}</span><span class="nm">${esc(p.name)}</span><span class="pts">${p.score}<small>points · ${p.wins} win${p.wins === 1 ? '' : 's'}</small></span></li>`; }).join('')}</ol>
+    <div class="sheet-actions">${btns}</div>`, 'results');
+}
+function openScores() {
+  if (!V) return;
+  openModal(`<h2>Table <span>scores</span></h2>
+    <p class="lede">Points this game, and games won at this table.${V.waiting && V.waiting.length ? ' Waiting to join: ' + esc(V.waiting.join(', ')) + '.' : ''}</p>
+    <ol class="order">${rankedOrder().map((i, k) => { const p = V.players[i]; return `<li class="${i === V.me ? 'me-row' : ''}"><span class="pl">${k + 1}</span><span class="nm">${esc(p.name)}</span><span class="pts">${p.score}<small>${p.wins} win${p.wins === 1 ? '' : 's'}</small></span></li>`; }).join('')}</ol>
+    <div class="sheet-actions"><button class="btn primary" type="button" data-close>Close</button></div>`);
+}
+function openLeave() {
+  const msg = role === 'host' ? 'This closes the room for everyone in it.' : role === 'guest' ? 'You can rejoin with the same code and name.' : 'Your game is saved. You can continue it from the start screen.';
+  openModal(`<h2>${role === 'host' ? 'Close the <span>room</span>?' : role === 'guest' ? 'Leave the <span>room</span>?' : 'Quit to the <span>start screen</span>?'}</h2>
+    <p class="lede">${msg}</p>
+    <div class="sheet-actions"><button class="btn" type="button" data-close>Stay</button><button class="btn primary" type="button" id="mLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave' : 'Quit to start screen'}</button></div>`);
+}
+
+/* ================= starting things ================= */
+function readName() {
+  const v = ($('hName').value || '').trim().slice(0, 14);
+  if (!v) { homeMsg = 'Type your name first.'; homeErr = true; renderHome(); $('hName').focus(); return false; }
+  myName = v; setItem(LS, 'fa-name', v);
+  return true;
+}
+function loadUsed() { const u = getItem(LS, 'fa-used'); return u && typeof u === 'object' && !Array.isArray(u) ? { en: u.en || [], ar: u.ar || [] } : { en: [], ar: [] }; }
+function startSolo(bots) {
+  if (!readName()) return;
+  const o = Object.assign({}, getItem(LS, 'fa-opts') || {}, { lang: $('hLangHome').value });
+  setItem(LS, 'fa-opts', fixOpts(o));
+  role = 'solo'; S = baseState('solo', o);
+  S.used = loadUsed();
+  S.players.push(newPlayer(me, myName, false));
+  for (let i = 0; i < bots; i++) S.players.push(newPlayer('bot-' + rid(), BOT_NAMES[i], true));
+  shownOver = null; lastQKey = '';
+  newGame();
+}
+function continueSolo() {
+  const s = getItem(LS, 'fa-solo');
+  if (!s || s.v !== 1) return;
+  role = 'solo'; S = s; S.hostId = me;
+  const hp = S.players.find(p => !p.bot); if (hp) { hp.id = me; hp.online = true; }
+  shownOver = S.phase === 'over' ? S.game : null; lastQKey = '';
+  if (S.phase === 'write') { setClock(S.opts.time); S.players.forEach((p, i) => { if (p.bot && S.fakes[i] == null) S.botAt[i] = Date.now() + 2000 + Math.random() * 5000; }); }
+  else if (S.phase === 'pick') { setClock(S.opts.time ? PICK_SECS : 0); S.players.forEach((p, i) => { if (p.bot && S.picks[i] == null) S.botAt[i] = Date.now() + 2000 + Math.random() * 5000; }); }
+  normalizeHost();
+  changed();
+}
+function createRoom() {
+  if (!readName()) return;
+  if (waitNet(createRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = (window.GN && GN.code()) || newCode(); hostSess = rid(); shownOver = null; lastQKey = '';
+  S = baseState('room', getItem(LS, 'fa-opts'));
+  S.used = loadUsed();
+  S.players.push(newPlayer(me, myName, false));
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  changed();
+}
+function reopenRoom() {
+  const g = getItem(LS, 'fa-host');
+  if (!g || !g.S) return;
+  if (!readName()) return;
+  if (waitNet(reopenRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = g.code; hostSess = rid(); S = g.S;
+  const hp = S.players.find(p => p.id === S.hostId) || S.players.find(p => !p.bot);
+  if (hp) { hp.id = me; hp.name = myName; }
+  S.hostId = me;
+  shownOver = S.phase === 'over' ? S.game : null; lastQKey = '';
+  if (S.phase === 'write') setClock(S.opts.time);
+  else if (S.phase === 'pick') setClock(S.opts.time ? PICK_SECS : 0);
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  normalizeHost();
+  changed();
+}
+function joinFromForm() {
+  if (!readName()) return;
+  const code = ($('hCode').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (code.length !== 4) { homeMsg = 'Room codes are 4 letters.'; homeErr = true; renderHome(); return; }
+  if (waitNet(joinFromForm)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  history.replaceState(null, '', '#' + code);
+  pickFor = ''; shownOver = null; lastQKey = '';
+  joinRoom(code);
+}
+/* remember which questions this phone has seen, so the next game starts with new ones */
+setInterval(() => { if (S && S.used) setItem(LS, 'fa-used', { en: (S.used.en || []).slice(-QS_EN.length), ar: (S.used.ar || []).slice(-QS_AR.length) }); }, 5000);
+
+/* ================= events ================= */
+$('hSolo').addEventListener('click', () => startSolo(+$('hBots').value));
+$('hContinue').addEventListener('click', () => { if (readName()) continueSolo(); });
+$('hCreate').addEventListener('click', createRoom);
+$('hReopen').addEventListener('click', reopenRoom);
+$('joinForm').addEventListener('submit', e => { e.preventDefault(); joinFromForm(); });
+$('hRules').addEventListener('click', openRules);
+$('hName').addEventListener('input', () => { if (homeErr) { homeMsg = ''; homeErr = false; $('homeMsg').textContent = ''; } });
+$('hLangHome').value = fixOpts(getItem(LS, 'fa-opts')).lang;
+
+$('lAddBot').addEventListener('click', () => act('addBot'));
+$('lStart').addEventListener('click', () => act('start'));
+function sendSettings() { const o = fixOpts({ lang: $('lLangSel').value, count: $('lCountSel').value, time: $('lTimeSel').value, dbl: $('lDoubleSel').value === '1' }); setItem(LS, 'fa-opts', o); act('settings', o); }
+['lLangSel', 'lCountSel', 'lTimeSel', 'lDoubleSel'].forEach(id => $(id).addEventListener('change', sendSettings));
+$('lPlayers').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (b) act('remove', { id: b.dataset.remove }); });
+$('lRules').addEventListener('click', openRules);
+$('lLeave').addEventListener('click', openLeave);
+$('lCopy').addEventListener('click', () => {
+  const link = shareLink(), msg = $('lCopyMsg');
+  const done = t => { msg.textContent = t; setTimeout(() => { msg.textContent = ''; }, 2500); };
+  if (navigator.share) {
+    navigator.share({ title: 'Fake Answers', text: `Join my Fake Answers room. Code: ${roomCode}`, url: link }).catch(() => {});
+    return;
+  }
+  const pickText = () => { const r = document.createRange(); r.selectNodeContents($('lLink')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Link selected. Copy it from here.'); };
+  try { navigator.clipboard.writeText(link).then(() => done('Link copied. Send it to your friends.'), pickText); } catch (e) { pickText(); }
+});
+
+$('writeForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!V || V.phase !== 'write' || V.mine != null || V.me < 0) return;
+  const t = cleanText($('writeIn').value);
+  if (!t) { $('sub').textContent = 'Type something first.'; return; }
+  $('writeSend').disabled = true;
+  act('write', { text: t });
+});
+$('stage').addEventListener('click', e => {
+  const b = e.target.closest('[data-pick]');
+  if (!b || b.disabled || !V || V.phase !== 'pick' || V.myPick != null) return;
+  b.classList.add('picked');
+  $('stage').querySelectorAll('[data-pick]').forEach(x => { x.disabled = true; });
+  act('pick', { k: +b.dataset.pick });
+});
+$('actMore').addEventListener('click', e => {
+  if (e.target.closest('#aClose')) act('close');
+  else if (e.target.closest('#aNext')) act('next');
+  else if (e.target.closest('#aNew')) { closeModal(); act('next'); }
+  else if (e.target.closest('#aResults')) openResults();
+});
+$('btnRules').addEventListener('click', openRules);
+$('btnScores').addEventListener('click', openScores);
+$('btnLeave').addEventListener('click', openLeave);
+$('btnMenu').addEventListener('click', () => {
+  openModal(`<h2>Menu</h2>
+    <div class="menu-list">
+      <button class="btn" type="button" id="mmRules">Rules</button>
+      <button class="btn" type="button" id="mmScores">Scores</button>
+      ${V && V.phase === 'over' ? '<button class="btn" type="button" id="mmResults">Final scores</button>' : ''}
+      <button class="btn" type="button" id="mmLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave room' : 'Quit to start screen'}</button>
+    </div>
+    <div class="sheet-actions"><button class="btn primary" type="button" data-close>Back to the game</button></div>`);
+});
+$('modal').addEventListener('click', e => {
+  if (e.target === $('modal') || e.target.closest('[data-close]')) closeModal();
+  else if (e.target.closest('#mmRules')) openRules();
+  else if (e.target.closest('#mmScores')) openScores();
+  else if (e.target.closest('#mmResults')) openResults();
+  else if (e.target.closest('#mmLeave')) openLeave();
+  else if (e.target.closest('#mNew')) { closeModal(); act('next'); }
+  else if (e.target.closest('#mLobby')) { closeModal(); act('lobby'); }
+  else if (e.target.closest('#mLeave')) {
+    closeModal();
+    if (role === 'solo') { token++; clearTimeout(timer); role = null; S = null; V = null; shownOver = null; homeMsg = ''; homeErr = false; render(); }
+    else leave();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
+window.addEventListener('pagehide', () => { if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'away' }); } catch (e) { /* skip */ } } });
+window.addEventListener('beforeunload', e => { if (role === 'host' && conns.size && !window.GN_LEAVING) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ================= boot ================= */
+(function boot() {
+  const hashCode = (location.hash || '').replace('#', '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (hashCode.length === 4) $('hCode').value = hashCode;
+  const savedGuest = getItem(LS, 'fa-guest');
+  const savedHost = getItem(LS, 'fa-host');
+  render();
+  if (!onlineOK) return;
+  NET.then(() => {
+    if (role) return;
+    if (window.GN && GN.code()) { $('hName').value = GN.name(); if (GN.isHost()) createRoom(); else { $('hCode').value = GN.code(); joinFromForm(); } return; }
+    if (myName && savedHost && savedHost.code && hashCode === savedHost.code && netReady()) { reopenRoom(); return; }
+    if (myName && savedGuest && savedGuest.code && (!hashCode || hashCode === savedGuest.code) && netReady()) { joinRoom(savedGuest.code); return; }
+    if (hashCode.length === 4) { homeMsg = myName ? `Tap Join room to join room ${hashCode}.` : `Type your name, then tap Join room to join room ${hashCode}.`; renderHome(); }
+  });
+})();
+})();
+</script>
+
+</html>
